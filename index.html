@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="ECHO">
+<meta name="description" content="Record lectures and get instant transcripts and smart notes.">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>ECHO</title>
+<style>
+  :root {
+    --bg:#0d0d0d;--surface:#161616;--surface2:#1f1f1f;--border:#2a2a2a;
+    --text:#f0f0f0;--muted:#888;--amber:#f59e0b;--amber-dim:#92600a;
+    --red:#ef4444;--green:#22c55e;--accent:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+  .logo{font-size:20px;font-weight:700;letter-spacing:6px;color:var(--text)}
+  .logo span{color:var(--amber)}
+  .badge{font-size:10px;font-weight:600;letter-spacing:1px;background:#1a2a12;color:var(--green);border:1px solid #2d4a1f;border-radius:20px;padding:3px 10px;text-transform:uppercase}
+  .icon-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+  .status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;flex-shrink:0}
+  .status-chip{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);transition:background .3s}
+  .status-dot.recording{background:var(--red);animation:blink 1s infinite}
+  .status-dot.processing{background:var(--amber);animation:blink .5s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  .timer{font-size:13px;font-family:'Courier New',monospace;color:var(--muted);letter-spacing:2px}
+  .waveform-wrap{padding:8px 20px 4px;flex-shrink:0;height:52px;display:flex;align-items:center}
+  #waveCanvas{width:100%;height:36px;border-radius:6px}
+  .record-area{display:flex;align-items:center;justify-content:center;padding:16px 20px;gap:24px;flex-shrink:0}
+  .record-btn{width:72px;height:72px;border-radius:50%;border:3px solid var(--red);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;flex-shrink:0}
+  .record-btn:active{transform:scale(.93)}
+  .record-btn.recording{animation:pulse 1.5s ease-out infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}70%{box-shadow:0 0 0 14px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+  .record-inner{width:28px;height:28px;border-radius:50%;background:var(--red);transition:all .2s}
+  .record-btn.recording .record-inner{border-radius:6px;width:22px;height:22px}
+  .side-btn{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .side-btn:active{background:var(--surface2);transform:scale(.96)}
+  .side-btn.primary{border-color:var(--amber-dim);color:var(--amber)}
+  .side-btn-icon{font-size:18px}
+  .side-btn-label{font-size:10px;color:var(--muted);letter-spacing:.5px}
+  .tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;padding:0 20px;gap:4px}
+  .tab{flex:1;padding:10px 0;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer;text-align:center;transition:all .2s}
+  .tab.active{color:var(--text);border-color:var(--amber)}
+  .content{flex:1;overflow:hidden;position:relative}
+  .panel{position:absolute;inset:0;overflow-y:auto;padding:16px 20px 100px;display:none;-webkit-overflow-scrolling:touch}
+  .panel.active{display:block}
+  .transcript-text{font-family:'Courier New',monospace;font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  .interim{color:var(--muted);font-style:italic}
+  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--muted);text-align:center;padding-top:40px}
+  .empty-icon{font-size:40px;opacity:.3}
+  .empty-title{font-size:15px;font-weight:500}
+  .empty-sub{font-size:13px;opacity:.7}
+  .notes-content{font-size:14px;line-height:1.75;color:var(--text)}
+  .notes-content h2{font-size:15px;font-weight:600;color:var(--amber);margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  .notes-content h2:first-child{margin-top:0}
+  .notes-content p{margin-bottom:10px}
+  .notes-content ul{padding-left:18px;margin-bottom:10px}
+  .notes-content li{margin-bottom:5px}
+  .notes-content strong{color:var(--amber);font-weight:600}
+  .kw-chip{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--muted);margin:3px 3px 3px 0}
+  .action-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 16px calc(10px + env(safe-area-inset-bottom))}
+  .action-btn{flex:1;padding:9px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:.5px;cursor:pointer;text-align:center;transition:all .15s}
+  .action-btn:active{opacity:.6;transform:scale(.96)}
+  .action-btn.highlight{border-color:var(--amber-dim);color:var(--amber)}
+  .action-btn.danger{border-color:#451a1a;color:var(--red)}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:flex-end;z-index:100}
+  .modal-overlay.hidden{display:none}
+  .modal{background:var(--surface);border-radius:20px 20px 0 0;border:1px solid var(--border);border-bottom:none;padding:24px 24px calc(24px + env(safe-area-inset-bottom));width:100%;max-height:85vh;overflow-y:auto}
+  .modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px}
+  .modal h3{font-size:17px;font-weight:600;margin-bottom:10px}
+  .modal p{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+  .modal-btn{width:100%;padding:14px;background:var(--amber);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+  .install-step{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+  .install-step:last-child{border-bottom:none}
+  .step-num{width:24px;height:24px;border-radius:50%;background:var(--amber);color:#000;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+  .step-text{font-size:13px;color:var(--muted);line-height:1.6}
+  .step-text strong{color:var(--text)}
+  .processing-overlay{position:absolute;inset:0;background:rgba(13,13,13,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:10}
+  .processing-overlay.hidden{display:none}
+  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .processing-text{font-size:14px;color:var(--muted)}
+  .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:8px 20px;font-size:13px;color:var(--text);opacity:0;transition:all .3s;z-index:200;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* Install banner */
+  .install-banner{display:none;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a2a12;border-bottom:1px solid #2d4a1f;gap:10px;flex-shrink:0}
+  .install-banner.show{display:flex}
+  .install-banner-text{font-size:12px;color:var(--green);font-weight:500}
+  .install-banner-btn{background:var(--green);color:#000;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- INSTALL BANNER (shows on Android when installable) -->
+<div class="install-banner" id="installBanner">
+  <span class="install-banner-text">📲 Add ECHO to your home screen</span>
+  <button class="install-banner-btn" id="installBannerBtn">Install</button>
+</div>
+
+<div class="header">
+  <div class="logo">ECH<span>O</span></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge">Free · Offline</span>
+    <div class="icon-btn" id="infoBtn">?</div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-chip">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusLabel">READY</span>
+  </div>
+  <div class="timer" id="timerDisplay">00:00</div>
+</div>
+
+<div class="waveform-wrap"><canvas id="waveCanvas"></canvas></div>
+
+<div class="record-area">
+  <button class="side-btn primary" id="summarizeBtn">
+    <span class="side-btn-icon">✦</span>
+    <span class="side-btn-label">Summarize</span>
+  </button>
+  <button class="record-btn" id="recordBtn">
+    <div class="record-inner"></div>
+  </button>
+  <button class="side-btn" id="clearBtn">
+    <span class="side-btn-icon">↺</span>
+    <span class="side-btn-label">Clear</span>
+  </button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-transcript" onclick="switchTab('transcript')">Transcript</div>
+  <div class="tab" id="tab-notes" onclick="switchTab('notes')">Notes</div>
+</div>
+
+<div class="content">
+  <div class="panel active" id="panel-transcript">
+    <div class="empty-state" id="transcriptEmpty">
+      <div class="empty-icon">🎙</div>
+      <div class="empty-title">No transcript yet</div>
+      <div class="empty-sub">Tap the red button to start recording</div>
+    </div>
+    <div class="transcript-text" id="transcriptDisplay" style="display:none"></div>
+  </div>
+  <div class="panel" id="panel-notes">
+    <div class="empty-state" id="notesEmpty">
+      <div class="empty-icon">✦</div>
+      <div class="empty-title">No notes yet</div>
+      <div class="empty-sub">Record something, then tap Summarize</div>
+    </div>
+    <div class="notes-content" id="notesDisplay" style="display:none"></div>
+    <div class="processing-overlay hidden" id="processingOverlay">
+      <div class="spinner"></div>
+      <div class="processing-text">Building smart notes…</div>
+    </div>
+  </div>
+</div>
+
+<div class="action-bar">
+  <div class="action-btn" id="copyTranscriptBtn">Copy Transcript</div>
+  <div class="action-btn highlight" id="copyNotesBtn">Copy Notes</div>
+  <div class="action-btn danger" id="downloadBtn">Download</div>
+</div>
+
+<!-- INFO / INSTALL MODAL -->
+<div class="modal-overlay hidden" id="infoModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>Install ECHO</h3>
+    <p>Free, offline, no account needed. Works like a native app once installed.</p>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:4px 16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:var(--amber);padding:10px 0 6px;text-transform:uppercase">iPhone / Safari</div>
+      <div class="install-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Open this page in <strong>Safari</strong> (not Chrome)</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Tap the <strong>Share button</strong> at the bottom of the screen</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">3</div>
+        <div class="step-text">Scroll down and tap <strong>"Add to Home Screen"</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">4</div>
+        <div class="step-text">Tap <strong>Add</strong> — ECHO appears on your home screen</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:4px 16px;margin-bottom:20px">
+      <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:var(--accent);padding:10px 0 6px;text-transform:uppercase">Android / Chrome</div>
+      <div class="install-step">
+        <div class="step-num">1</div>
+        <div class="step-text">Open this page in <strong>Chrome</strong></div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">2</div>
+        <div class="step-text">Tap the <strong>three-dot menu</strong> (top right)</div>
+      </div>
+      <div class="install-step">
+        <div class="step-num">3</div>
+        <div class="step-text">Tap <strong>"Add to Home Screen"</strong> or <strong>"Install App"</strong></div>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:16px">
+      Hosted on GitHub Pages · always free · no tracking
+    </p>
+    <button class="modal-btn" id="closeInfoBtn">Got it</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── PWA SERVICE WORKER ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// ─── INSTALL PROMPT (Android Chrome) ─────────────────────────
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('installBannerBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('installBanner').classList.remove('show');
+  if (outcome === 'accepted') showToast('ECHO installed!');
+});
+window.addEventListener('appinstalled', () => {
+  document.getElementById('installBanner').classList.remove('show');
+  showToast('ECHO installed!');
+});
+
+// ─── STATE ────────────────────────────────────────────────────
+let isRecording=false,recognition=null,finalTranscript='',interimTranscript='',timerInterval=null,elapsed=0;
+
+// ─── CANVAS ──────────────────────────────────────────────────
+const canvas=document.getElementById('waveCanvas'),ctx=canvas.getContext('2d');
+const BAR_COUNT=32,bars=Array.from({length:BAR_COUNT},()=>({h:2,target:2}));
+function resizeCanvas(){canvas.width=canvas.offsetWidth*window.devicePixelRatio;canvas.height=canvas.offsetHeight*window.devicePixelRatio}
+resizeCanvas();window.addEventListener('resize',resizeCanvas);
+function drawWave(){
+  const W=canvas.width,H=canvas.height;ctx.clearRect(0,0,W,H);
+  const bW=(W/BAR_COUNT)*.55,gap=(W/BAR_COUNT)*.45;
+  bars.forEach((b,i)=>{
+    b.target=isRecording?4+Math.random()*(H*.85):2;b.h+=(b.target-b.h)*.15;
+    const x=i*(bW+gap)+gap/2,y=(H-b.h)/2,a=isRecording?.5+(b.h/H)*.5:.15;
+    ctx.fillStyle=isRecording?`rgba(245,158,11,${a})`:`rgba(255,255,255,${a})`;
+    const r=Math.min(bW/2,b.h/2,3);ctx.beginPath();ctx.roundRect(x,y,bW,b.h,r);ctx.fill();
+  });
+  requestAnimationFrame(drawWave);
+}
+drawWave();
+
+// ─── TIMER ───────────────────────────────────────────────────
+function startTimer(){elapsed=0;timerInterval=setInterval(()=>{elapsed++;const m=String(Math.floor(elapsed/60)).padStart(2,'0'),s=String(elapsed%60).padStart(2,'0');document.getElementById('timerDisplay').textContent=m+':'+s},1000)}
+function stopTimer(){clearInterval(timerInterval)}
+
+// ─── SPEECH ──────────────────────────────────────────────────
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR){document.getElementById('statusLabel').textContent='NOT SUPPORTED';document.getElementById('recordBtn').style.cssText='opacity:.3;pointer-events:none'}
+function initRec(){
+  recognition=new SR();recognition.continuous=true;recognition.interimResults=true;recognition.lang='en-US';
+  recognition.onstart=()=>{setStatus('recording');startTimer()};
+  recognition.onresult=e=>{
+    interimTranscript='';
+    for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalTranscript+=t+' ';else interimTranscript+=t}
+    renderTranscript();
+  };
+  recognition.onerror=e=>{if(e.error==='not-allowed'){showToast('Microphone access denied.');stopRecording()}else if(e.error!=='no-speech')showToast('Error: '+e.error)};
+  recognition.onend=()=>{if(isRecording)try{recognition.start()}catch(e){}};
+}
+function renderTranscript(){
+  const el=document.getElementById('transcriptDisplay'),empty=document.getElementById('transcriptEmpty'),full=finalTranscript+interimTranscript;
+  if(full.trim()){empty.style.display='none';el.style.display='block';el.innerHTML=finalTranscript+(interimTranscript?`<span class="interim">${interimTranscript}</span>`:'');el.scrollTop=el.scrollHeight}
+  else{empty.style.display='';el.style.display='none'}
+}
+function setStatus(state){
+  document.getElementById('statusDot').className='status-dot '+state;
+  document.getElementById('statusLabel').textContent={idle:'READY',recording:'RECORDING',processing:'PROCESSING'}[state]||'READY';
+}
+function startRecording(){if(!SR)return;isRecording=true;document.getElementById('recordBtn').classList.add('recording');initRec();recognition.start()}
+function stopRecording(){isRecording=false;document.getElementById('recordBtn').classList.remove('recording');stopTimer();setStatus('idle');if(recognition)try{recognition.stop()}catch(e){};interimTranscript='';renderTranscript()}
+document.getElementById('recordBtn').addEventListener('click',()=>{if(isRecording)stopRecording();else startRecording()});
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  if(isRecording)stopRecording();
+  finalTranscript='';interimTranscript='';renderTranscript();
+  document.getElementById('notesDisplay').style.display='none';document.getElementById('notesEmpty').style.display='';
+  document.getElementById('timerDisplay').textContent='00:00';elapsed=0;
+});
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');document.getElementById('panel-'+n).classList.add('active');
+}
+
+// ─── OFFLINE SUMMARIZER ──────────────────────────────────────
+const STOP=new Set(['a','an','the','and','or','but','in','on','at','to','for','of','with','is','are','was','were','be','been','have','has','had','do','does','did','will','would','could','should','may','might','can','i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their','this','that','these','those','what','which','who','how','when','where','why','if','so','as','by','from','not','no','up','out','about','into','then','than','just','also','like','very','more','some','all','there','here','get','got','going','well','know','think','right','because','even','still','really','okay','yeah','um','uh','so','let','now','one','two','three','four','five']);
+function tokenize(t){return t.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>2)}
+function extractKeywords(text,n=14){
+  const words=tokenize(text),freq={};
+  words.forEach(w=>{if(!STOP.has(w))freq[w]=(freq[w]||0)+1});
+  for(let i=0;i<words.length-1;i++){const a=words[i],b=words[i+1];if(!STOP.has(a)&&!STOP.has(b)){const bg=a+' '+b;freq[bg]=(freq[bg]||0)+.7}}
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,n).map(e=>e[0]);
+}
+function scoreSentences(sentences,keywords){
+  return sentences.map((s,idx)=>{
+    const lower=s.toLowerCase();let score=0;keywords.forEach(kw=>{if(lower.includes(kw))score+=1});
+    const pos=idx<3?1.3:idx>sentences.length-4?1.1:1.0;
+    const len=s.split(' ').length,ls=len>=6&&len<=35?1.0:.5;
+    return{s,score:score*pos*ls};
+  });
+}
+function detectTopics(kws){
+  const map={'History':['year','century','period','war','era','historical','revolution'],'Science':['cell','gene','protein','organism','evolution','molecule','atom','chemical','biology','physics'],'Technology':['software','algorithm','data','computer','network','system','digital','internet'],'Economics':['market','economy','price','cost','revenue','profit','business','trade'],'Math':['equation','formula','theorem','proof','function','variable','algebra','calculus'],'Health':['disease','treatment','patient','symptom','diagnosis','medicine','drug','therapy'],'Environment':['climate','carbon','energy','environment','ecosystem','pollution'],'Philosophy':['ethics','moral','justice','truth','knowledge','consciousness','belief']};
+  const s=kws.join(' ').toLowerCase();
+  return Object.entries(map).filter(([,h])=>h.some(v=>s.includes(v))).slice(0,2).map(e=>e[0]);
+}
+function buildNotes(text){
+  const raw=text.trim().replace(/\s+/g,' ');
+  const sentences=(raw.match(/[^.!?]+[.!?]*/g)||[raw]).map(s=>s.trim()).filter(s=>s.split(' ').length>=4);
+  const keywords=extractKeywords(text,14);
+  const scored=scoreSentences(sentences,keywords);
+  const sorted=[...scored].sort((a,b)=>b.score-a.score);
+  const topN=Math.min(3,Math.ceil(sentences.length*.2));
+  const summarySet=new Set(sorted.slice(0,topN).map(x=>x.s));
+  const summaryLines=sentences.filter(s=>summarySet.has(s)).slice(0,3);
+  const usedSet=new Set(summaryLines);
+  const keyPoints=sorted.filter(x=>!usedSet.has(x.s)&&x.score>0).slice(0,6).map(x=>x.s);
+  const wordCount=raw.split(/\s+/).length;
+  return{summaryLines,keyPoints,keywords:keywords.slice(0,10),topics:detectTopics(keywords),wordCount,readMins:Math.max(1,Math.round(wordCount/150))};
+}
+function renderNotes({summaryLines,keyPoints,keywords,topics,wordCount,readMins}){
+  let html=`<div style="display:flex;gap:10px;margin-bottom:18px">
+    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:600;color:var(--amber)">${wordCount}</div>
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;margin-top:2px">WORDS</div>
+    </div>
+    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:600;color:var(--amber)">${readMins} min</div>
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;margin-top:2px">READ TIME</div>
+    </div>
+    ${topics.length?`<div style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:4px">TOPIC</div>
+      <div style="font-size:12px;color:var(--accent);font-weight:500">${topics.join(', ')}</div>
+    </div>`:''}
+  </div>`;
+  if(summaryLines.length){html+=`<h2>Summary</h2>`;summaryLines.forEach(s=>{html+=`<p>${s}</p>`})}
+  if(keyPoints.length){html+=`<h2>Key Points</h2><ul>`;keyPoints.forEach(s=>{html+=`<li>${s}</li>`});html+=`</ul>`}
+  if(keywords.length){html+=`<h2>Key Terms</h2><div style="margin-bottom:8px">`;keywords.forEach(k=>{html+=`<span class="kw-chip">${k}</span>`});html+=`</div>`}
+  const el=document.getElementById('notesDisplay');
+  el.innerHTML=html;el.style.display='block';document.getElementById('notesEmpty').style.display='none';
+}
+document.getElementById('summarizeBtn').addEventListener('click',()=>{
+  const text=finalTranscript.trim();if(!text){showToast('Nothing to summarize yet.');return}
+  switchTab('notes');
+  const ov=document.getElementById('processingOverlay');ov.classList.remove('hidden');setStatus('processing');
+  setTimeout(()=>{renderNotes(buildNotes(text));ov.classList.add('hidden');setStatus('idle')},120);
+});
+document.getElementById('copyTranscriptBtn').addEventListener('click',()=>{
+  const t=finalTranscript.trim();if(!t){showToast('No transcript to copy.');return}
+  navigator.clipboard.writeText(t).then(()=>showToast('Transcript copied!'));
+});
+document.getElementById('copyNotesBtn').addEventListener('click',()=>{
+  const el=document.getElementById('notesDisplay');
+  if(!el.innerHTML||el.style.display==='none'){showToast('No notes to copy.');return}
+  navigator.clipboard.writeText(el.innerText).then(()=>showToast('Notes copied!'));
+});
+document.getElementById('downloadBtn').addEventListener('click',()=>{
+  const t=finalTranscript.trim(),n=document.getElementById('notesDisplay').innerText||'';
+  if(!t&&!n){showToast('Nothing to download.');return}
+  const now=new Date(),d=now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),ti=now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  const m=String(Math.floor(elapsed/60)).padStart(2,'0'),s=String(elapsed%60).padStart(2,'0');
+  let c=`ECHO — Lecture Notes\n${d} at ${ti} · Duration: ${m}:${s}\n${'─'.repeat(40)}\n\n`;
+  if(n)c+=`SMART NOTES\n${'─'.repeat(40)}\n${n}\n\n`;
+  if(t)c+=`FULL TRANSCRIPT\n${'─'.repeat(40)}\n${t}\n`;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/plain'}));
+  a.download=`echo-notes-${now.toISOString().slice(0,10)}.txt`;a.click();showToast('Downloaded!');
+});
+document.getElementById('infoBtn').addEventListener('click',()=>document.getElementById('infoModal').classList.remove('hidden'));
+document.getElementById('closeInfoBtn').addEventListener('click',()=>document.getElementById('infoModal').classList.add('hidden'));
+document.getElementById('infoModal').addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden')});
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+</script>
+</body>
+</html>
